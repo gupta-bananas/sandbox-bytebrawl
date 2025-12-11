@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Editor from "react-simple-code-editor";
 import hljs from "highlight.js";
-import "highlight.js/styles/github.css";
+import "highlight.js/styles/atom-one-dark.css";
 import { supabase } from "./lib/supabaseClient";
 
 type SandboxProps = {
@@ -50,6 +50,67 @@ export default function Sandbox({ roomId, userId }: SandboxProps) {
     language: string;
     output: string;
   };
+  // Fetch opponent's existing code
+  const fetchOpponentCode = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("live_code_files")
+        .select("*")
+        .eq("room_id", roomId)
+        .neq("user_id", userId);
+
+      if (error) {
+        console.error("Error fetching opponent code:", error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        // Get the most recent file from the opponent
+        const opponentFile = data[0] as LiveCodeFile;
+        setOtherCode(opponentFile.code || "// Waiting for opponent...");
+        setOtherOutput(opponentFile.output || "");
+      }
+    } catch (err) {
+      console.error("Error fetching opponent code:", err);
+    }
+  }, [roomId, userId]);
+
+  // Fetch opponent's existing code when component mounts or room changes
+  useEffect(() => {
+    fetchOpponentCode();
+    
+    // Also poll periodically to catch when opponent joins (fallback for realtime)
+    const intervalId = setInterval(() => {
+      fetchOpponentCode();
+    }, 2000); // Check every 2 seconds
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [fetchOpponentCode]);
+
+  // Send current code to database when joining a room (so opponent sees it immediately)
+  useEffect(() => {
+    const announceJoin = async () => {
+      try {
+        await supabase.from("live_code_files").upsert({
+          room_id: roomId,
+          user_id: userId,
+          filename: "main",
+          code: myCode,
+          language: languageMap[language],
+          output: myOutput,
+        });
+      } catch (err) {
+        console.error("Error announcing join:", err);
+      }
+    };
+
+    announceJoin();
+    // Only run when roomId or userId changes (i.e., when joining a room)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId, userId]);
+
   // Subscribe to Realtime updates
   useEffect(() => {
     const channel = supabase
@@ -65,8 +126,12 @@ export default function Sandbox({ roomId, userId }: SandboxProps) {
         (payload) => {
           const updatedFile = payload.new as LiveCodeFile;
           if (updatedFile.user_id !== userId) {
-            setOtherCode(updatedFile.code);
-            setOtherOutput(updatedFile.output);
+            setOtherCode(updatedFile.code || "// Waiting for opponent...");
+            setOtherOutput(updatedFile.output || "");
+          }
+          // Also refetch to ensure we have the latest data, especially on INSERT
+          if (payload.eventType === "INSERT") {
+            fetchOpponentCode();
           }
         }
       )
@@ -75,7 +140,7 @@ export default function Sandbox({ roomId, userId }: SandboxProps) {
     return () => {
       supabase.removeChannel(channel); // pass the channel object, not a string
     };
-  }, [roomId, userId]);
+  }, [roomId, userId, fetchOpponentCode]);
 
   // Handle typing & sync
   const handleMyCodeChange = async (newCode: string) => {
