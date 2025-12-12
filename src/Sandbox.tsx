@@ -5,7 +5,7 @@ import "highlight.js/styles/atom-one-dark.css";
 import { supabase } from "./lib/supabaseClient";
 
 type SandboxProps = {
-  roomId: string;
+  roomId: number;
   userId: string;
 };
 
@@ -64,7 +64,7 @@ export default function Sandbox({ roomId, userId }: SandboxProps) {
     return code;
   };
   type LiveCodeFile = {
-    room_id: string;
+    room_id: number;
     user_id: string;
     filename: string;
     code: string;
@@ -237,7 +237,8 @@ export default function Sandbox({ roomId, userId }: SandboxProps) {
 
   return (
     <div className="p-6 min-h-screen bg-white flex flex-col gap-4">
-      <h1 className="text-2xl font-bold">1v1 Live Coding Sandbox</h1>
+      <h1 className="text-2xl font-bold" style={{ marginBottom: 0 }}>1v1 Live Coding Sandbox</h1>
+      <h2 className="text-lg font-bold" style={{ marginTop: 0 }}>Room: {roomId}</h2>
 
       <select
         value={language}
@@ -253,10 +254,23 @@ export default function Sandbox({ roomId, userId }: SandboxProps) {
         <option value={71}>Python</option>
       </select>
 
+      <br />
+      <br />
+
+      
+
       <div className="flex gap-4">
         {/* Your editor */}
         <div className="flex-1 flex flex-col gap-2">
-          <h2 className="font-bold">You</h2>
+          <h2 className="font-bold">You &nbsp; &nbsp;
+            <button
+              onClick={runCode}
+              disabled={running}
+              className="px-4 py-2 bg-gray-200 rounded w-fit disabled:opacity-50"
+            >
+              {running ? "Running..." : "Run Code"}
+            </button>
+          </h2>
           <Editor
             value={myCode}
             onValueChange={handleMyCodeChange}
@@ -301,14 +315,6 @@ export default function Sandbox({ roomId, userId }: SandboxProps) {
           </pre>
         </div>
       </div>
-
-      <button
-        onClick={runCode}
-        disabled={running}
-        className="px-4 py-2 bg-gray-200 rounded w-fit disabled:opacity-50"
-      >
-        {running ? "Running..." : "Run Code"}
-      </button>
     </div>
   );
 }
