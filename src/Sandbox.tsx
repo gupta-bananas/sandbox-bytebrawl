@@ -9,6 +9,29 @@ type SandboxProps = {
   userId: string;
 };
 
+// Language templates
+const templateMap: Record<number, string> = {
+  63: "// Javascript Template\nfunction solve() {\n  return 'Hello World';\n}",
+  62: `// Java Template
+class Main {
+  public void solve() {
+    System.out.println("Hello, world!");
+  }
+
+  public static void main(String[] args) {
+    new Main().solve();
+  }
+}`,
+  54: `// C++ Template
+#include <iostream>
+int main() {
+  std::cout << "Hello, World!" << std::endl;
+  return 0;
+}`,
+  71: `# Python Template
+print("Hello, World!")`,
+};
+
 const languageMap: Record<number, string> = {
   63: "javascript",
   62: "java",
@@ -24,9 +47,7 @@ const judge0LanguageIds: Record<number, number> = {
 };
 
 export default function Sandbox({ roomId, userId }: SandboxProps) {
-  const [myCode, setMyCode] = useState(
-    "// JS template\nfunction solve() {\n  return 'Hello World';\n}"
-  );
+  const [myCode, setMyCode] = useState(templateMap[63]);
   const [myOutput, setMyOutput] = useState("");
   const [otherCode, setOtherCode] = useState("// Waiting for opponent...");
   const [otherOutput, setOtherOutput] = useState("");
@@ -50,6 +71,7 @@ export default function Sandbox({ roomId, userId }: SandboxProps) {
     language: string;
     output: string;
   };
+
   // Fetch opponent's existing code
   const fetchOpponentCode = useCallback(async () => {
     try {
@@ -74,20 +96,6 @@ export default function Sandbox({ roomId, userId }: SandboxProps) {
       console.error("Error fetching opponent code:", err);
     }
   }, [roomId, userId]);
-
-  // Fetch opponent's existing code when component mounts or room changes
-  useEffect(() => {
-    fetchOpponentCode();
-    
-    // Also poll periodically to catch when opponent joins (fallback for realtime)
-    const intervalId = setInterval(() => {
-      fetchOpponentCode();
-    }, 2000); // Check every 2 seconds
-
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [fetchOpponentCode]);
 
   // Send current code to database when joining a room (so opponent sees it immediately)
   useEffect(() => {
@@ -233,7 +241,10 @@ export default function Sandbox({ roomId, userId }: SandboxProps) {
 
       <select
         value={language}
-        onChange={(e) => setLanguage(Number(e.target.value))}
+        onChange={(e) => {
+          setMyCode(templateMap[Number(e.target.value)]);
+          setLanguage(Number(e.target.value));
+        }}
         className="border p-2 rounded w-fit"
       >
         <option value={63}>JavaScript</option>
