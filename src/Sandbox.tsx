@@ -1,12 +1,35 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Editor from "react-simple-code-editor";
 import hljs from "highlight.js";
-import "highlight.js/styles/github.css";
+import "highlight.js/styles/atom-one-dark.css";
 import { supabase } from "./lib/supabaseClient";
 
 type SandboxProps = {
-  roomId: string;
+  roomId: number;
   userId: string;
+};
+
+// Language templates
+const templateMap: Record<number, string> = {
+  63: "// Javascript Template\nfunction solve() {\n  return 'Hello World';\n}",
+  62: `// Java Template
+class Main {
+  public void solve() {
+    System.out.println("Hello, world!");
+  }
+
+  public static void main(String[] args) {
+    new Main().solve();
+  }
+}`,
+  54: `// C++ Template
+#include <iostream>
+int main() {
+  std::cout << "Hello, World!" << std::endl;
+  return 0;
+}`,
+  71: `# Python Template
+print("Hello, World!")`,
 };
 
 const languageMap: Record<number, string> = {
@@ -24,9 +47,7 @@ const judge0LanguageIds: Record<number, number> = {
 };
 
 export default function Sandbox({ roomId, userId }: SandboxProps) {
-  const [myCode, setMyCode] = useState(
-    "// JS template\nfunction solve() {\n  return 'Hello World';\n}"
-  );
+  const [myCode, setMyCode] = useState(templateMap[63]);
   const [myOutput, setMyOutput] = useState("");
   const [otherCode, setOtherCode] = useState("// Waiting for opponent...");
   const [otherOutput, setOtherOutput] = useState("");
@@ -43,13 +64,61 @@ export default function Sandbox({ roomId, userId }: SandboxProps) {
     return code;
   };
   type LiveCodeFile = {
-    room_id: string;
+    room_id: number;
     user_id: string;
     filename: string;
     code: string;
     language: string;
     output: string;
   };
+
+  // Fetch opponent's existing code
+  const fetchOpponentCode = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("live_code_files")
+        .select("*")
+        .eq("room_id", roomId)
+        .neq("user_id", userId);
+
+      if (error) {
+        console.error("Error fetching opponent code:", error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        // Get the most recent file from the opponent
+        const opponentFile = data[0] as LiveCodeFile;
+        setOtherCode(opponentFile.code || "// Waiting for opponent...");
+        setOtherOutput(opponentFile.output || "");
+      }
+    } catch (err) {
+      console.error("Error fetching opponent code:", err);
+    }
+  }, [roomId, userId]);
+
+  // Send current code to database when joining a room (so opponent sees it immediately)
+  useEffect(() => {
+    const announceJoin = async () => {
+      try {
+        await supabase.from("live_code_files").upsert({
+          room_id: roomId,
+          user_id: userId,
+          filename: "main",
+          code: myCode,
+          language: languageMap[language],
+          output: myOutput,
+        });
+      } catch (err) {
+        console.error("Error announcing join:", err);
+      }
+    };
+
+    announceJoin();
+    // Only run when roomId or userId changes (i.e., when joining a room)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId, userId]);
+
   // Subscribe to Realtime updates
   useEffect(() => {
     const channel = supabase
@@ -65,8 +134,12 @@ export default function Sandbox({ roomId, userId }: SandboxProps) {
         (payload) => {
           const updatedFile = payload.new as LiveCodeFile;
           if (updatedFile.user_id !== userId) {
-            setOtherCode(updatedFile.code);
-            setOtherOutput(updatedFile.output);
+            setOtherCode(updatedFile.code || "// Waiting for opponent...");
+            setOtherOutput(updatedFile.output || "");
+          }
+          // Also refetch to ensure we have the latest data, especially on INSERT
+          if (payload.eventType === "INSERT") {
+            fetchOpponentCode();
           }
         }
       )
@@ -75,7 +148,7 @@ export default function Sandbox({ roomId, userId }: SandboxProps) {
     return () => {
       supabase.removeChannel(channel); // pass the channel object, not a string
     };
-  }, [roomId, userId]);
+  }, [roomId, userId, fetchOpponentCode]);
 
   // Handle typing & sync
   const handleMyCodeChange = async (newCode: string) => {
@@ -164,11 +237,15 @@ export default function Sandbox({ roomId, userId }: SandboxProps) {
 
   return (
     <div className="p-6 min-h-screen bg-white flex flex-col gap-4">
-      <h1 className="text-2xl font-bold">1v1 Live Coding Sandbox</h1>
+      <h1 className="text-2xl font-bold" style={{ marginBottom: 0 }}>1v1 Live Coding Sandbox</h1>
+      <h2 className="text-lg font-bold" style={{ marginTop: 0 }}>Room: {roomId}</h2>
 
       <select
         value={language}
-        onChange={(e) => setLanguage(Number(e.target.value))}
+        onChange={(e) => {
+          setMyCode(templateMap[Number(e.target.value)]);
+          setLanguage(Number(e.target.value));
+        }}
         className="border p-2 rounded w-fit"
       >
         <option value={63}>JavaScript</option>
@@ -177,10 +254,23 @@ export default function Sandbox({ roomId, userId }: SandboxProps) {
         <option value={71}>Python</option>
       </select>
 
+      <br />
+      <br />
+
+      
+
       <div className="flex gap-4">
         {/* Your editor */}
         <div className="flex-1 flex flex-col gap-2">
-          <h2 className="font-bold">You</h2>
+          <h2 className="font-bold">You &nbsp; &nbsp;
+            <button
+              onClick={runCode}
+              disabled={running}
+              className="px-4 py-2 bg-gray-200 rounded w-fit disabled:opacity-50"
+            >
+              {running ? "Running..." : "Run Code"}
+            </button>
+          </h2>
           <Editor
             value={myCode}
             onValueChange={handleMyCodeChange}
@@ -225,14 +315,6 @@ export default function Sandbox({ roomId, userId }: SandboxProps) {
           </pre>
         </div>
       </div>
-
-      <button
-        onClick={runCode}
-        disabled={running}
-        className="px-4 py-2 bg-gray-200 rounded w-fit disabled:opacity-50"
-      >
-        {running ? "Running..." : "Run Code"}
-      </button>
     </div>
   );
 }
