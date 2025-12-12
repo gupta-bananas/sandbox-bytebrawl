@@ -38,32 +38,6 @@ export default function Onboarding() {
 
   return (
     <div className="onboarding">
-      {/* Feature Cards Section */}
-      <section className="features-section">
-        <div className="features-grid">
-          <FeatureCard
-            icon="⚡"
-            title="Real-time 1v1 matches"
-            description="Low-latency rooms with live typing indicators, opponent's progress bar, test results, and complexity score updates in real-time."
-          />
-          <FeatureCard
-            icon="🏆"
-            title="ELO ranking system"
-            description="Skill-based progress. Gain ELO by winning, face tougher opponents, and feel the high stakes of losses."
-          />
-          <FeatureCard
-            icon="👥"
-            title="Friends vs Random matchmaking"
-            description="Pick your rivals. Find opponents, spin up private lobbies with friends, or queue into ranked matchmaking."
-          />
-          <FeatureCard
-            icon="⏱️"
-            title="Time-limited rounds"
-            description="Timed duels that matter. Bonus points for optimal complexity. Practice under pressure."
-          />
-        </div>
-      </section>
-
       {/* Hero Section with Live Duel Preview */}
       <section className="hero-section">
         <div className="hero-container">
@@ -392,6 +366,32 @@ export default function Onboarding() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Feature Cards Section */}
+      <section className="features-section">
+        <div className="features-grid">
+          <FeatureCard
+            icon="⚡"
+            title="Real-time 1v1 matches"
+            description="Low-latency rooms with live typing indicators, opponent's progress bar, test results, and complexity score updates in real-time."
+          />
+          <FeatureCard
+            icon="🏆"
+            title="ELO ranking system"
+            description="Skill-based progress. Gain ELO by winning, face tougher opponents, and feel the high stakes of losses."
+          />
+          <FeatureCard
+            icon="👥"
+            title="Friends vs Random matchmaking"
+            description="Pick your rivals. Find opponents, spin up private lobbies with friends, or queue into ranked matchmaking."
+          />
+          <FeatureCard
+            icon="⏱️"
+            title="Time-limited rounds"
+            description="Timed duels that matter. Bonus points for optimal complexity. Practice under pressure."
+          />
         </div>
       </section>
 
